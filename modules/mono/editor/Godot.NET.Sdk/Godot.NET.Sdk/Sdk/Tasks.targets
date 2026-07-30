@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <_GDTasksDirectory>$(MSBuildThisFileDirectory)..\tasks\</_GDTasksDirectory>
+    <_GDTasksAssembly>$(_GDTasksDirectory)Godot.NET.Sdk.Tasks.dll</_GDTasksAssembly>
+  </PropertyGroup>
+</Project>

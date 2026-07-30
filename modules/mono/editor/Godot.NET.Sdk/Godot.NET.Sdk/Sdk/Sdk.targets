@@ -51,4 +51,7 @@
   <!-- iOS-specific build targets -->
   <Import Project="$(MSBuildThisFileDirectory)\iOS.targets" Condition=" '$(GodotTargetPlatform)' == 'ios' " />
 
+  <!-- Import custom MSBuild tasks -->
+  <Import Project="$(MSBuildThisFileDirectory)\Tasks.targets" />
+
 </Project>
