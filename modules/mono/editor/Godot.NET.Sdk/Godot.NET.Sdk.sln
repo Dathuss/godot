@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GodotSharp", "..\..\glue\Go
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Godot.NET.Sdk.Tasks", "Godot.NET.Sdk.Tasks\Tasks\Godot.NET.Sdk.Tasks.csproj", "{BB50C11F-84A1-4C47-9844-672160F05F91}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Godot.NET.Sdk.Tasks.StringCaching", "Godot.NET.Sdk.Tasks\StringCaching\Godot.NET.Sdk.Tasks.StringCaching.csproj", "{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -97,6 +99,18 @@ Global
 		{BB50C11F-84A1-4C47-9844-672160F05F91}.Release|x64.Build.0 = Release|Any CPU
 		{BB50C11F-84A1-4C47-9844-672160F05F91}.Release|x86.ActiveCfg = Release|Any CPU
 		{BB50C11F-84A1-4C47-9844-672160F05F91}.Release|x86.Build.0 = Release|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Debug|x64.Build.0 = Debug|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Debug|x86.Build.0 = Debug|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Release|x64.ActiveCfg = Release|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Release|x64.Build.0 = Release|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Release|x86.ActiveCfg = Release|Any CPU
+		{0B1ED3F2-F84B-4492-91BF-B6CA130E8999}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

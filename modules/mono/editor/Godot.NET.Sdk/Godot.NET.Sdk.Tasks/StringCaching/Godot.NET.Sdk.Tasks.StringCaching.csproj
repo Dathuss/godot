@@ -11,9 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.8.2" PrivateAssets="all" ExcludeAssets="Runtime" />
-
-    <ProjectReference Include="..\StringCaching\Godot.NET.Sdk.Tasks.StringCaching.csproj" />
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
   </ItemGroup>
 
 </Project>

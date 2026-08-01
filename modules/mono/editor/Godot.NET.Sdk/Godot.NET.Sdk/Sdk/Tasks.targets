@@ -3,4 +3,6 @@
     <_GDTasksDirectory>$(MSBuildThisFileDirectory)..\tasks\</_GDTasksDirectory>
     <_GDTasksAssembly>$(_GDTasksDirectory)Godot.NET.Sdk.Tasks.dll</_GDTasksAssembly>
   </PropertyGroup>
+
+  <Import Project="$(_GDTasksDirectory)Godot.NET.Sdk.StringCaching.targets" />
 </Project>

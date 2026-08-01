@@ -1,0 +1,101 @@
+using System.Collections.Generic;
+using System.IO;
+using Mono.Cecil;
+using Mono.Cecil.Cil;
+using Mono.Collections.Generic;
+
+namespace Godot.NET.Sdk.Tasks.StringCaching;
+
+internal class CacheTypesEmitter(StringCachingContext ctx)
+{
+    public const string STRING_NAME_CACHE_TYPE_NAME_PREFIX = "?_StringNameCache_";
+    public const string NODE_PATH_CACHE_TYPE_NAME_PREFIX = "?_NodePathCache_";
+
+    public readonly Dictionary<string, FieldDefinition> StringNamesToCache = [];
+    public readonly Dictionary<string, FieldDefinition> NodePathsToCache = [];
+
+    public void Reset()
+    {
+        StringNamesToCache.Clear();
+        NodePathsToCache.Clear();
+    }
+
+    public FieldDefinition AddStringName(string value)
+    {
+        if (StringNamesToCache.TryGetValue(value, out FieldDefinition? fld))
+            return fld;
+
+        string fieldName = $"_{StringNamesToCache.Count}";
+        FieldDefinition field = new(fieldName, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.InitOnly, ctx.Imported_StringNameType);
+        StringNamesToCache.Add(value, field);
+        return field;
+    }
+
+    public FieldDefinition AddNodePath(string value)
+    {
+        if (NodePathsToCache.TryGetValue(value, out FieldDefinition? fld))
+            return fld;
+
+        string fieldName = $"_{NodePathsToCache.Count}";
+        FieldDefinition field = new(fieldName, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.InitOnly, ctx.Imported_NodePathType);
+        NodePathsToCache.Add(value, field);
+        return field;
+    }
+
+    /// <summary>
+    /// Emits the static types that cache NodePath and StringName values
+    /// </summary
+    public void EmitTypes()
+    {
+        TypeDefinition EmitType(string name, Dictionary<string, FieldDefinition> namesToCache, MethodReference ctorMethod)
+        {
+            TypeDefinition type = new("", name, TypeAttributes.Class | TypeAttributes.NotPublic | TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, ctx.Module.TypeSystem.Object);
+            type.Fields.Capacity = namesToCache.Count;
+
+            /*
+                Note: `.cctor` is the name of a type's static constructor.
+                Writing `static Foo bar = new Foo();` is syntax sugar for:
+
+                ```
+                static Foo bar;
+
+                static DeclaringClass()
+                {
+                    bar = new Foo();
+                }
+                ```
+            */
+            MethodDefinition cctor = new(".cctor", MethodAttributes.Private | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.RTSpecialName | MethodAttributes.SpecialName, ctx.Module.TypeSystem.Void);
+            Collection<Instruction> instructions = cctor.Body.Instructions;
+            instructions.Capacity = (3 * namesToCache.Count) + 1;
+
+            foreach (var kv in namesToCache)
+            {
+                string value = kv.Key;
+                FieldDefinition field = kv.Value;
+                type.Fields.Add(field);
+                instructions.Add(Instruction.Create(OpCodes.Ldstr, value));
+                instructions.Add(Instruction.Create(OpCodes.Newobj, ctorMethod));
+                instructions.Add(Instruction.Create(OpCodes.Stsfld, field));
+            }
+            instructions.Add(Instruction.Create(OpCodes.Ret));
+            type.Methods.Add(cctor);
+            ctx.Module.Types.Add(type);
+
+            return type;
+        }
+
+        // We emit a name unique to the assembly, in the rare case the user recompiles the library
+        // with an assembly merger like ILRepack, to avoid type name conflicts
+        string assemblyName = Path.GetFileNameWithoutExtension(ctx.Module.Name);
+        if (StringNamesToCache.Count != 0)
+        {
+            EmitType($"{STRING_NAME_CACHE_TYPE_NAME_PREFIX}{assemblyName}", StringNamesToCache, ctx.Imported_StringName_StringCtor);
+        }
+
+        if (NodePathsToCache.Count != 0)
+        {
+            EmitType($"{NODE_PATH_CACHE_TYPE_NAME_PREFIX}{assemblyName}", NodePathsToCache, ctx.Imported_NodePath_StringCtor);
+        }
+    }
+}

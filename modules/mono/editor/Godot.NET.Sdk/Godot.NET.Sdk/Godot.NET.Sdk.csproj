@@ -60,6 +60,11 @@
     <None Include="Sdk\Tasks.targets" Pack="true" PackagePath="Sdk" />
     <None Include="$(TasksTopDirectory)Tasks\targets\*.targets" Pack="true" PackagePath="tasks" />
     <None Include="$(TasksOutputDirectory)Godot.NET.Sdk.Tasks.dll" Pack="true" PackagePath="tasks" />
+
+    <!-- Package string-caching related files. -->
+    <None Include="$(TasksOutputDirectory)Godot.NET.Sdk.Tasks.StringCaching.dll" Pack="true" PackagePath="tasks" />
+    <None Include="$(TasksOutputDirectory)Mono.Cecil.dll" Pack="true" PackagePath="tasks" />
+    <None Include="$(TasksOutputDirectory)Mono.Cecil.Pdb.dll" Pack="true" PackagePath="tasks" />
   </ItemGroup>
 
 </Project>

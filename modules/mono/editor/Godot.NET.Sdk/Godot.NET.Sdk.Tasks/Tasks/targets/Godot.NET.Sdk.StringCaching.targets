@@ -1,0 +1,110 @@
+<Project>
+  <UsingTask AssemblyFile="$(_GDTasksAssembly)" TaskName="Godot.NET.Sdk.Tasks.CacheMainAssemblyStringsTask" />
+  <UsingTask AssemblyFile="$(_GDTasksAssembly)" TaskName="Godot.NET.Sdk.Tasks.CacheDependenciesStringsTask" />
+
+  <PropertyGroup>
+    <GDCacheStrings Condition="'$(GDCacheStrings)' == ''">false</GDCacheStrings>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GDCacheStrings)' == 'true'">
+    <!--
+      The main assembly's symbols file (aka PDB file) has to be rebuilt by Cecil.
+      Unfortunately, for this specific file, we cannot reinject it into the normal build flow,
+      so we will copy it by hand
+    -->
+    <SkipCopyingSymbolsToOutputDirectory>true</SkipCopyingSymbolsToOutputDirectory>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+  </PropertyGroup>
+
+  <!--
+    ======================================================
+                    CacheMainAssemblyStrings
+    Runs before CopyFilesToOutputDirectory.
+    Will patch the main assembly and its associated symbols file, if exists.
+    The DLL will be cached in the intermediate folder, and SDK Items that track it
+    will get redirected to the new path. This way, the build flow can seamlessly continue.
+    Unfortunately, we cannot do this for the PDB file, which we will have to copy by hand.
+    ======================================================
+  -->
+  <Target Name="CacheMainAssemblyStrings" BeforeTargets="CopyFilesToOutputDirectory" Condition="'$(GDCacheStrings)' == 'true'">
+    <Godot.NET.Sdk.Tasks.CacheMainAssemblyStringsTask
+      AssemblyName="$(AssemblyName)"
+      IntermediateAssembly="@(IntermediateAssembly)"
+      ReferencePath="@(ReferencePath)"
+      IntermediateOutputPath="$(IntermediateOutputPath)"
+    >
+      <Output TaskParameter="CachedIntermediateAssembly" ItemName="_GDCachedIntermediateAssembly" />
+      <Output TaskParameter="OutputPdbFile" ItemName="_GDOutputPdbFile" />
+      <Output TaskParameter="EmittedFiles" ItemName="FileWrites" />
+    </Godot.NET.Sdk.Tasks.CacheMainAssemblyStringsTask>
+
+    <ItemGroup>
+      <IntermediateAssembly Remove="@(IntermediateAssembly)" />
+      <IntermediateAssembly Include="@(_GDCachedIntermediateAssembly)" />
+
+      <!-- Add our custom PDB as a file to publish -->
+      <ResolvedFileToPublish Include="@(_GDOutputPdbFile)">
+        <RelativePath>@(_GDOutputPdbFile->'%(Filename)%(Extension)')</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+
+    <!--
+      Most of these parameters are copied from the sdk file, because we want to maintain
+      something as close as the normal build as possible.
+    -->
+    <Copy
+      SourceFiles="@(_GDOutputPdbFile)"
+      DestinationFiles="@(IntermediateAssembly->'$(OutDir)%(Filename).pdb')"
+      SkipUnchangedFiles="$(SkipCopyUnchangedFiles)"
+      OverwriteReadOnlyFiles="$(OverwriteReadOnlyFiles)"
+      Retries="$(CopyRetryCount)"
+      RetryDelayMilliseconds="$(CopyRetryDelayMilliseconds)"
+      UseHardlinksIfPossible="$(CreateHardLinksForCopyFilesToOutputDirectoryIfPossible)"
+      UseSymboliclinksIfPossible="$(CreateSymbolicLinksForCopyFilesToOutputDirectoryIfPossible)"
+      ErrorIfLinkFails="$(ErrorIfLinkFailsForCopyFilesToOutputDirectory)"
+    >
+      <Output TaskParameter="DestinationFiles" ItemName="FileWrites" />
+    </Copy>
+  </Target>
+
+  <!--
+    ======================================================
+                    CacheDependenciesStrings
+    Runs after ResolveAssemblyReferences.
+    Will patch dependency assemblies marked with CacheStrings, and their associated symbols file, if exists.
+    The patched files will be cached in the intermediate folder, and SDK Items that track dependencies
+    will get redirected to the new paths. This way, the build flow can seamlessly continue.
+    ======================================================
+  -->
+  <Target Name="CacheDependenciesStrings" AfterTargets="ResolveAssemblyReferences" >
+    <Godot.NET.Sdk.Tasks.CacheDependenciesStringsTask
+      IntermediateOutputPath="$(IntermediateOutputPath)"
+      ReferencePath="@(ReferencePath)"
+      ReferenceCopyLocalPaths="@(ReferenceCopyLocalPaths)"
+      PackageReference="@(PackageReference)"
+
+      CacheStrings="@(CacheStrings)"
+    >
+      <Output TaskParameter="RemovedReferencePath" ItemName="_GDRemovedReferencePath" />
+      <Output TaskParameter="AddedReferencePath" ItemName="_GDAddedReferencePath" />
+      <Output TaskParameter="RemovedReferenceCopyLocalPaths" ItemName="_GDRemovedReferenceCopyLocalPaths" />
+      <Output TaskParameter="AddedReferenceCopyLocalPaths" ItemName="_GDAddedReferenceCopyLocalPaths" />
+      <Output TaskParameter="EmittedFiles" ItemName="FileWrites" />
+    </Godot.NET.Sdk.Tasks.CacheDependenciesStringsTask>
+
+    <ItemGroup>
+      <!-- Replace the assembly paths with our cached assemblies' paths -->
+      <ReferencePath Remove="@(_GDRemovedReferencePath)" />
+      <ReferencePath Include="@(_GDAddedReferencePath)" />
+      <ReferenceCopyLocalPaths Remove="@(_GDRemovedReferenceCopyLocalPaths)" />
+      <ReferenceCopyLocalPaths Include="@(_GDAddedReferenceCopyLocalPaths)" />
+    </ItemGroup>
+  </Target>
+
+  <ItemDefinitionGroup>
+    <CacheStrings>
+    </CacheStrings>
+  </ItemDefinitionGroup>
+
+</Project>
