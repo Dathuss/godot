@@ -226,5 +226,28 @@ namespace Godot.SourceGenerators
                 isEnabledByDefault: true,
                 "The class must not be generic. Make the class non-generic, or remove the '[GlobalClass]' attribute.",
                 helpLinkUri: string.Format(_helpLinkFormat, "GD0402"));
+
+
+        public static readonly DiagnosticDescriptor StringTypeImplicitOperatorWithNonConstantStringRule =
+            new DiagnosticDescriptor(
+                id: "GD0501",
+                title: "Implicitly allocating StringName/NodePath from non-constant string",
+                messageFormat: "Implicitly allocating {0} from non-constant string",
+                category: "Usage",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true,
+                "When creating a StringName or NodePath from a non-constant string, prefer using \"new StringName\" or \"new NodePath\" to make the allocation explicit.",
+                helpLinkUri: "TODO");
+
+        public static readonly DiagnosticDescriptor StringTypeConstructorWithConstantStringRule =
+            new DiagnosticDescriptor(
+                id: "GD0502",
+                title: "Using StringName/NodePath constructor with constant string",
+                messageFormat: "Using {0} constructor with constant string",
+                category: "Usage",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true,
+                "Consider removing the constructor in order to statically cache the StringName or NodePath.",
+                helpLinkUri: "TODO");
     }
 }

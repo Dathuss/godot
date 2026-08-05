@@ -1,0 +1,182 @@
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Text;
+
+namespace Godot.SourceGenerators;
+
+[DiagnosticAnalyzer(LanguageNames.CSharp)]
+public sealed class NonConstStringOperatorAnalyzer : DiagnosticAnalyzer
+{
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; }
+        = ImmutableArray.Create(Common.StringTypeImplicitOperatorWithNonConstantStringRule);
+
+    public override void Initialize(AnalysisContext context)
+    {
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+        context.EnableConcurrentExecution();
+        context.RegisterOperationAction(AnalyzeOperation, OperationKind.Conversion);
+    }
+
+    private void AnalyzeOperation(OperationAnalysisContext context)
+    {
+        if (context.Operation is IConversionOperation
+            {
+                Operand.ConstantValue.HasValue: false,
+                Operand.Type.SpecialType: SpecialType.System_String,
+                Type: ITypeSymbol type
+            } && type.FullQualifiedNameOmitGlobal() is GodotClasses.StringName or GodotClasses.NodePath)
+        {
+            string typeName = type.Name;
+            context.ReportDiagnostic(Diagnostic.Create(
+                Common.StringTypeImplicitOperatorWithNonConstantStringRule,
+                context.Operation.Syntax.GetLocation(),
+                ImmutableDictionary.CreateRange(new KeyValuePair<string, string?>[] { new("typeName", typeName) }),
+                typeName));
+        }
+    }
+}
+
+[ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(NonConstStringOperatorCodeFixProvider))]
+public sealed class NonConstStringOperatorCodeFixProvider : CodeFixProvider
+{
+    public override ImmutableArray<string> FixableDiagnosticIds { get; } = ImmutableArray.Create(Common.StringTypeImplicitOperatorWithNonConstantStringRule.Id);
+
+    // We cannot use WellKnownFixAllProviders.BatchFixer because it does not work when
+    // diagnostics have spans that overlap, which is possible with this code rule.
+    // https://github.com/dotnet/roslyn/blob/main/docs/analyzers/FixAllProvider.md#limitations-of-the-batchfixer
+    private static readonly FixAllProvider _fixAll = FixAllProvider.Create(FixAllAsync);
+    public override FixAllProvider? GetFixAllProvider() => _fixAll;
+
+    public override async Task RegisterCodeFixesAsync(CodeFixContext context)
+    {
+        SyntaxNode? root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
+        if (root == null)
+            return;
+        SemanticModel? semanticModel = await context.Document.GetSemanticModelAsync().ConfigureAwait(false);
+        if (semanticModel == null)
+            return;
+
+        Diagnostic diagnostic = context.Diagnostics.First();
+
+        TextSpan diagnosticSpan = diagnostic.Location.SourceSpan;
+
+        SyntaxNode syntaxNode = root.FindNode(diagnosticSpan, getInnermostNodeForTie: true);
+
+        if (syntaxNode is not ExpressionSyntax expression)
+            return;
+
+        // Guaranteed to be either "StringName" or "NodePath"
+        string typeName = diagnostic.Properties["typeName"]!;
+
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: "Add explicit constructor",
+                createChangedDocument: ct => AddExplicitConstructorAsync(context.Document, semanticModel, typeName, expression, ct),
+                equivalenceKey: "GDStringTypeAddCtor"),
+            context.Diagnostics
+        );
+    }
+
+    private static async Task<Document> AddExplicitConstructorAsync(Document document, SemanticModel semanticModel,
+        string typeName, ExpressionSyntax expressionToBuild, CancellationToken ct)
+    {
+        ExpressionSyntax replacementExpression = ReplaceExpression(
+            expressionToBuild, semanticModel, typeName, ct);
+
+        SyntaxNode oldRoot = (await document.GetSyntaxRootAsync(ct).ConfigureAwait(false))!;
+        SyntaxNode newRoot = oldRoot.ReplaceNode(expressionToBuild, replacementExpression);
+        newRoot = AddUsingIfNecessary(newRoot, semanticModel, typeName, expressionToBuild.SpanStart);
+
+        return document.WithSyntaxRoot(newRoot);
+    }
+
+    private static ExpressionSyntax ReplaceExpression(ExpressionSyntax expressionToReplace, SemanticModel semanticModel, string typeName, CancellationToken ct)
+    {
+        // Remove explicit cast to StringName/NodePath if present
+        ExpressionSyntax expressionInsideConstructor = expressionToReplace;
+        if (expressionToReplace is CastExpressionSyntax castExpression)
+        {
+            if (semanticModel.GetSymbolInfo(castExpression.Type, ct).Symbol?.Name == typeName)
+            {
+                expressionInsideConstructor = castExpression.Expression;
+            }
+        }
+
+        // For any expression "expr", replace it with "new StringName(expr)"/"new NodePath(expr)"
+        ObjectCreationExpressionSyntax objectCreationExpression = SyntaxFactory.ObjectCreationExpression(
+            type: SyntaxFactory.IdentifierName(typeName),
+            argumentList: SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(
+                SyntaxFactory.Argument(expressionInsideConstructor)
+            )),
+            initializer: null
+        );
+        return objectCreationExpression;
+    }
+
+    private static SyntaxNode AddUsingIfNecessary(SyntaxNode root, SemanticModel semanticModel, string typeName, int currentSpan)
+    {
+        if (root is CompilationUnitSyntax compilationUnit)
+        {
+            // Check if the symbol "StringName"/"NodePath" is accessible
+            ISymbol? stringTypeSymbol = semanticModel.GetSpeculativeSymbolInfo(
+                currentSpan,
+                SyntaxFactory.IdentifierName(typeName),
+                SpeculativeBindingOption.BindAsTypeOrNamespace
+            ).Symbol;
+            if (stringTypeSymbol == null)
+            {
+                // Add "using Godot;" directive
+                root = compilationUnit.AddUsings(SyntaxFactory.UsingDirective(SyntaxFactory.IdentifierName("Godot")));
+            }
+        }
+        return root;
+    }
+
+    private static async Task<Document?> FixAllAsync(FixAllContext context, Document document, ImmutableArray<Diagnostic> diagnostics)
+    {
+        SyntaxNode? root = await document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
+        if (root == null)
+            return null;
+        SemanticModel? semanticModel = await document.GetSemanticModelAsync().ConfigureAwait(false);
+        if (semanticModel == null)
+            return null;
+
+        Dictionary<ExpressionSyntax, string> expressionsToReplace = new(diagnostics.Length);
+
+        foreach (Diagnostic diagnostic in diagnostics)
+        {
+            SyntaxNode syntaxNode = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
+            if (syntaxNode is ExpressionSyntax toReplace)
+            {
+                expressionsToReplace.Add(toReplace, diagnostic.Properties["typeName"]!);
+            }
+        }
+
+        SyntaxNode newRoot = root.ReplaceNodes(
+            expressionsToReplace.Keys,
+            (original, current) => ReplaceExpression(
+                current,
+                semanticModel,
+                expressionsToReplace[original],
+                context.CancellationToken)
+        );
+
+        newRoot = AddUsingIfNecessary(newRoot,
+            semanticModel,
+            // Since StringName and NodePath are in the same namespace, it doesn't matter which one is chosen
+            diagnostics[0].Properties["typeName"]!,
+            diagnostics[0].Location.SourceSpan.Start);
+
+        return document.WithSyntaxRoot(newRoot);
+    }
+}

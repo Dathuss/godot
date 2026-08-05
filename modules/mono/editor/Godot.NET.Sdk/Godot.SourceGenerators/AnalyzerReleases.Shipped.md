@@ -47,3 +47,13 @@ GD0108  |  Usage   |  Error   | ScriptPropertiesGenerator, [Documentation](https
 GD0109  |  Usage   |  Error   | ScriptPropertiesGenerator, [Documentation](https://docs.godotengine.org/en/latest/tutorials/scripting/c_sharp/diagnostics/GD0109.html)
 GD0110  |  Usage   |  Error   | ScriptPropertiesGenerator, [Documentation](https://docs.godotengine.org/en/latest/tutorials/scripting/c_sharp/diagnostics/GD0110.html)
 GD0111  |  Usage   |  Error   | ScriptPropertiesGenerator, [Documentation](https://docs.godotengine.org/en/latest/tutorials/scripting/c_sharp/diagnostics/GD0111.html)
+
+## Release 4.8
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|--------------------
+GD0501  |  Usage   | Warning  | NonConstStringOperatorAnalyzer, DOCS TODO
+GD0502  |  Usage   | Warning  | ConstStringConstructorAnalyzer, DOCS TODO
+
